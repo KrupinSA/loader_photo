@@ -1,12 +1,22 @@
-from os import error
-import subprocess
+import asyncio
 
-from subprocess import PIPE
+from asyncio import subprocess
+from asyncio.subprocess import PIPE
 
-command = ['zip', '-r', '-', 'README.md']
-process = subprocess.Popen(command, stdin=PIPE, stdout=PIPE)
+async def create_archive(command, arch_name):
 
-data, error = process.communicate()
+    process = await subprocess.create_subprocess_exec(*command, stdin=PIPE, stdout=PIPE)
+    with open(arch_name, 'b+w') as archive:
+        while True:
+            chunk = await process.stdout.read(500)
+            if process.stdout.at_eof():
+                break
+            archive.write(chunk)
 
-with open('readme.zip', 'b+w') as archive:
-    archive.write(data)
+async def main():
+    command = ['zip', '-r', '-', 'snap']
+    task = asyncio.create_task(create_archive(command, 'snap.zip'))
+    await task
+
+if __name__ == "__main__":
+    asyncio.run(main())
