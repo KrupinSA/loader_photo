@@ -1,28 +1,35 @@
-import datetime
 import aiofiles
 import asyncio
 
 from aiohttp import web
+from asyncio import subprocess
+from asyncio.subprocess import PIPE
 
 
-INTERVAL_SECS = 1
+INTERVAL_SECS = 0.5
+BASE_DIR = 'test_photos'
 
 async def archivate(request):
-    response = web.StreamResponse()
+    archive_hash = request.match_info.get('archive_hash')
 
-    response.headers['Content-Type'] = 'text/html'
+    response = web.StreamResponse()
+    response.headers['Content-Disposition'] = 'Attachment'
+    response.headers['Content-Disposition'] = f'filename={archive_hash}.zip'
 
     await response.prepare(request)
 
+    command = ['zip', '-r', '-', archive_hash]
+    process = await subprocess.create_subprocess_exec(*command,stdin=PIPE, stdout=PIPE, cwd=BASE_DIR)
+    chunk_len = 50000
     while True:
-        formatted_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        message = f'{formatted_date}<br>'  # <br> — HTML тег переноса строки
-
-        # Отправляет клиенту очередную порцию ответа
-        await response.write(message.encode('utf-8'))
-
+        chunk = await process.stdout.read(chunk_len)
+        if not chunk:
+            await response.write_eof()
+            break
+        await response.write(chunk)
         await asyncio.sleep(INTERVAL_SECS)
 
+    return response
 
 async def handle_index_page(request):
     async with aiofiles.open('index.html', mode='r') as index_file:
