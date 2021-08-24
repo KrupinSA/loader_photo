@@ -4,13 +4,23 @@ import asyncio
 from aiohttp import web
 from asyncio import subprocess
 from asyncio.subprocess import PIPE
-
+from os import path
+from aiohttp.web import HTTPNotFound
 
 INTERVAL_SECS = 0.5
 BASE_DIR = 'test_photos'
 
+def check_dir(archive_hash):
+    if archive_hash in [".", ".."]:
+        return False
+    full_dir = path.join(BASE_DIR, archive_hash)
+    return path.exists(full_dir)
+
 async def archivate(request):
     archive_hash = request.match_info.get('archive_hash')
+
+    if not check_dir(archive_hash):
+        raise HTTPNotFound(text='Файл удален или не существует')
 
     response = web.StreamResponse()
     response.headers['Content-Disposition'] = 'Attachment'
